@@ -81,12 +81,14 @@ import {
   treatmentFor,
   WAIT_REASONS,
   WALK,
+  WALK_LOCALES,
   WALK_POLICIES,
   type WalkLocale,
   waitingNote,
 } from "@/lib/durchgang";
 import { renderDocumentMarkdown } from "@/lib/mail/markdown";
 import { getRegistrationPortals } from "@/lib/registration-portals";
+import durchgangCs from "@/messages/durchgang/cs.json";
 import durchgangDe from "@/messages/durchgang/de.json";
 import durchgangEn from "@/messages/durchgang/en.json";
 import {
@@ -191,7 +193,11 @@ const logWalk = (entry: Parameters<typeof logAudit>[0] & { action: DurchgangActi
 const steps = (levels: unknown) => (Array.isArray(levels) ? levels.length : 0);
 
 const code = z.string().max(10);
-const NAMESPACES = { de: durchgangDe.durchgang, en: durchgangEn.durchgang } as const;
+const NAMESPACES = {
+  de: durchgangDe.durchgang,
+  en: durchgangEn.durchgang,
+  cs: durchgangCs.durchgang,
+} as const;
 
 const actorOf = (ctx: {
   companyId: string;
@@ -1553,7 +1559,10 @@ export const durchgangRouter = router({
       return { changed: changed.length };
     }),
 
-  /** 9.1: the company's crypto list, or the BSI TR-02102 list while it has not taken one over. */
+  /**
+   * 9.1: the company's crypto list, or the default list while it has not taken one over: BSI
+   * TR-02102, or NÚKIB's minimum requirements for a Czech account.
+   */
   cryptoList: durchgangProcedure.query(async ({ ctx }) => {
     const stored = await cryptoListOf(ctx.db, ctx.companyId);
     if (stored) return { stored: true as const, list: stored };
@@ -1562,7 +1571,7 @@ export const durchgangRouter = router({
   }),
 
   /**
-   * 9.1: takes the BSI TR-02102 list over as the company's crypto list, as an explicit write. A
+   * 9.1: takes the default list over as the company's crypto list, as an explicit write. A
    * list the company keeps already, edited on the requirement page, is never overwritten.
    */
   adoptCrypto: durchgangWrite
@@ -1596,7 +1605,7 @@ export const durchgangRouter = router({
         action: "durchgang.crypto_adopted",
         entityType: "requirement",
         entityId: ref.requirementId,
-        description: `${ref.code} BSI TR-02102 crypto list adopted`,
+        description: `${ref.code} ${locale === "cs" ? "NÚKIB" : "BSI TR-02102"} crypto list adopted`,
       });
       return { adopted: true };
     }),
@@ -1629,7 +1638,7 @@ export const durchgangRouter = router({
    * its headline in the viewer's language, resolved as the walk resolves it.
    */
   awaitingSignature: durchgangProcedure
-    .input(z.object({ locale: z.enum(["de", "en"]) }))
+    .input(z.object({ locale: z.enum(WALK_LOCALES) }))
     .query(async ({ ctx, input }) => {
       const { items } = await waitingForManagement(ctx.db, ctx.companyId);
       return items.map(({ code, drafts, reason }) => {
@@ -1649,7 +1658,7 @@ export const durchgangRouter = router({
    * approval before it signs; a step set aside comes with its headline in the viewer's language.
    */
   gaps: durchgangProcedure
-    .input(z.object({ locale: z.enum(["de", "en"]) }))
+    .input(z.object({ locale: z.enum(WALK_LOCALES) }))
     .query(async ({ ctx, input }) => shownGapsOf(ctx.db, ctx.companyId, input.locale)),
 
   /** Who takes care of each open point and by when, by step, for the approval and the export. */

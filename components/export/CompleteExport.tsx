@@ -7,7 +7,6 @@ import {
   gapLines,
   ONGOING_COPY,
   type ShownGap,
-  type WalkLocale,
   withPlanSlot,
 } from "@/lib/durchgang";
 import { fromScale, levelOf } from "@/lib/durchgang/ratings";
@@ -25,14 +24,15 @@ import {
 } from "@/lib/export/rows";
 import type { ExportNames } from "@/lib/export/value-names";
 import { exportLabels } from "@/lib/pdf/export-labels";
-import { formatReportDate, formatSigner } from "@/lib/pdf/format";
+import { formatReportDate, formatSigner, type PdfLocale } from "@/lib/pdf/format";
 import type { ReportData } from "@/lib/pdf/load-report-data";
 import { getReportLabels, getStatusLabel } from "@/lib/pdf/policy-labels";
 import type { RouterOutputs } from "@/lib/trpc/client";
 import { RiskCounts } from "./RiskCounts";
 
 export interface CompleteView {
-  readonly locale: WalkLocale;
+  /** The walk's language, which the whole export is written in. */
+  readonly locale: PdfLocale;
   readonly data: CompanyExport;
   /** The NIS 2 requirements by category; null without an assessment. */
   readonly report: ReportData | null;
@@ -54,7 +54,7 @@ export interface CompleteView {
  */
 function planLine(
   measure: CompleteView["measures"][number] | undefined,
-  locale: WalkLocale,
+  locale: PdfLocale,
   t: (key: "owner" | "due" | "formerMember") => string,
 ): string | null {
   const owner =
@@ -227,7 +227,7 @@ function Table({
 export async function CompleteExport({ view }: { view: CompleteView }) {
   const { locale, data, report, names, documents, gaps, measures } = view;
   const measureOf = new Map(measures.map((m) => [m.code, m]));
-  // One language throughout: the walk's, which is German or English.
+  // One language throughout: the walk's, which is German, English or Czech.
   const [t, tGaps, tScreens] = await Promise.all([
     getTranslations({ locale, namespace: "export.complete" }),
     getTranslations({ locale, namespace: "durchgang.ui.approve.gaps" }),
