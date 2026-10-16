@@ -1,8 +1,11 @@
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { getPathname } from "@/i18n/navigation";
 import { logAudit } from "@/lib/audit";
+import { isPlatformAdmin } from "@/lib/auth/platform-admin";
 import { epochSeconds, isRecentSignIn } from "@/lib/auth/session-age";
+import { mayWalkDurchgang } from "@/lib/billing/access";
 import { encloseCancelNotice, sendCancelNotice } from "@/lib/billing/cancel-notice";
 import type { DbOrTx } from "@/lib/db";
 import { alertGdprOperators } from "@/lib/gdpr/alert";
@@ -17,17 +20,36 @@ import {
 } from "@/lib/gdpr/self-erasure";
 import { sendErasureCertificate } from "@/lib/gdpr/send-certificate";
 import { isLocaleCode } from "@/lib/locale";
+import { accountEmailLocale, assistantConnectedEmail, sendMail } from "@/lib/mail";
 import { resolveEmailLocale } from "@/lib/mail/locale";
+import { assistantsAllowed } from "@/lib/mcp/allowed";
+import { issuer } from "@/lib/mcp/config";
+import {
+  connectionsOf,
+  endConnection,
+  endKeys,
+  openConnection,
+} from "@/lib/mcp/connections";
+import { instanceKey } from "@/lib/mcp/instance-key";
+import { mintKey, PASTED_KEY_SECONDS } from "@/lib/mcp/key";
+import { bumpMcpKeyVersion, mcpKeyVersionOf } from "@/lib/mcp/key-version";
+import { allow, readRequest } from "@/lib/mcp/oauth";
 import { HINT_COLUMN, HINTS } from "@/lib/onboarding/hints";
 import { rateLimit } from "@/lib/rate-limit";
-import { user } from "@/schema";
+import { getAppUrl } from "@/lib/utils";
+import { company, user } from "@/schema";
 import { userUpdateSchema } from "@/schema/validators";
 import {
+  accountProcedure,
+  companyProcedure,
   protectedProcedure,
   publicProcedure,
   router,
   selfErasureProcedure,
 } from "../init";
+
+/** The company the page showed when the person clicked, which the key or code is made for. */
+const shownCompany = z.object({ companyId: z.string().uuid() });
 
 export const userRouter = router({
   /**
@@ -109,6 +131,129 @@ export const userRouter = router({
         .where(eq(user.id, ctx.userId));
 
       return { hint: input.hint };
+    }),
+
+  /**
+   * A key for the person's AI assistants (lib/mcp): it works in the company open now, as this
+   * person with their role, for 90 days. Shown once and stored nowhere; its connection row is
+   * what Settings lists. The person's previous key in this company ends with it, so they hold one
+   * key at a time; assistants they signed in stay connected. An assistant cannot make itself a key.
+   */
+  createMcpKey: companyProcedure.input(shownCompany).mutation(async ({ ctx, input }) => {
+    mayConnectAssistant(ctx);
+    sameCompany(ctx, input.companyId);
+    await companyAllowsAssistants(ctx);
+    const version = await mcpKeyVersionOf(ctx.db, ctx.userId);
+    if (version === null) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Account not found." });
+    }
+    const now = new Date();
+    const nowS = epochSeconds(now);
+    const owner = { userId: ctx.userId, companyId: ctx.companyId };
+    const con = await ctx.db.transaction(async (tx) => {
+      // Two keys made at once (two tabs) wait here for each other, so the later one ends the
+      // earlier; without the lock neither sees the other's row and both stay open.
+      await tx
+        .select({ id: user.id })
+        .from(user)
+        .where(eq(user.id, ctx.userId))
+        .for("update");
+      await endKeys(tx, owner, now);
+      return openConnection(
+        tx,
+        {
+          ...owner,
+          kind: "key",
+          client: null,
+          keyVersion: version,
+          expiresAt: new Date((nowS + PASTED_KEY_SECONDS) * 1000),
+        },
+        now,
+      );
+    });
+    const key = mintKey(
+      instanceKey(),
+      { sub: ctx.userId, cid: ctx.companyId, ver: version, con },
+      "mcp",
+      nowS,
+      PASTED_KEY_SECONDS,
+    );
+    noticeAssistantConnected(ctx, { kind: "key" });
+    return { key };
+  }),
+
+  /**
+   * The person allowed an assistant on the consent page (lib/mcp/oauth.ts): the address it goes
+   * back to, with a code for this person in the company open now. The audit row of this call is
+   * the record of who connected which assistant.
+   */
+  allowMcpClient: companyProcedure
+    .input(shownCompany.extend({ request: z.string().max(8192) }))
+    .mutation(async ({ ctx, input }) => {
+      mayConnectAssistant(ctx);
+      sameCompany(ctx, input.companyId);
+      await companyAllowsAssistants(ctx);
+      const now = epochSeconds(new Date());
+      const request = readRequest(instanceKey(), input.request, now);
+      if (!request) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This request has expired. Connect again from the assistant.",
+        });
+      }
+      const version = await mcpKeyVersionOf(ctx.db, ctx.userId);
+      if (version === null) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Account not found." });
+      }
+      const holder = { sub: ctx.userId, cid: ctx.companyId, ver: version };
+      const url = allow(instanceKey(), request, holder, issuer(), now);
+      noticeAssistantConnected(ctx, {
+        kind: "signin",
+        assistant: request.client ?? null,
+        returnHost: new URL(request.redirectUri).host,
+      });
+      return { url };
+    }),
+
+  /** Ends the person's key and every assistant they connected, at once. */
+  disconnectMcp: protectedProcedure.mutation(async ({ ctx }) => {
+    await bumpMcpKeyVersion(ctx.db, ctx.userId);
+    return { disconnected: true };
+  }),
+
+  /**
+   * The person's connected assistants in the company open now: their key and each sign-in. On
+   * the account tier, as disconnecting all is unguarded: connections made while the plan
+   * included the walkthrough stay listed, and endable, after it lapses.
+   */
+  mcpConnections: accountProcedure.query(async ({ ctx }) => {
+    const version = await mcpKeyVersionOf(ctx.db, ctx.userId);
+    if (version === null) return [];
+    return connectionsOf(
+      ctx.db,
+      { userId: ctx.userId, companyId: ctx.companyId },
+      version,
+      new Date(),
+    );
+  }),
+
+  /**
+   * Ends one connected assistant, the others stay. Its keys stop at the next call: the endpoint
+   * and the token endpoint read the connection every time.
+   */
+  endMcpConnection: accountProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const ended = await endConnection(
+        ctx.db,
+        input.id,
+        { userId: ctx.userId, companyId: ctx.companyId },
+        new Date(),
+      );
+      if (!ended) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Connection not found." });
+      }
+      return { ended: true };
     }),
 
   /** Whether the signed-in person may delete their own account here, and what goes with it. */
@@ -220,6 +365,94 @@ export const userRouter = router({
 /** Deleting the account cannot be undone, so it asks for a sign-in from the last few minutes. */
 const signedInJustNow = (authTime: number | null | undefined) =>
   isRecentSignIn(authTime ?? null, epochSeconds(new Date()));
+
+/**
+ * Throws unless the person may connect an AI assistant now: from the browser, never with a key;
+ * with the walkthrough the assistant works in (the gate the durchgang procedures apply); and
+ * signed in within the last few minutes, because a key or an assistant's sign-in outlives the
+ * browser session it was made in, sign-out included. "reauth" sends the page to sign in again.
+ */
+function mayConnectAssistant(ctx: {
+  readonly viaKey: boolean;
+  readonly session: {
+    readonly accessLevel: Parameters<typeof mayWalkDurchgang>[0];
+    readonly authTime?: number | null;
+    readonly user: { readonly email?: string | null };
+  };
+}): void {
+  if (ctx.viaKey) throw new TRPCError({ code: "FORBIDDEN" });
+  if (
+    !mayWalkDurchgang(ctx.session.accessLevel, isPlatformAdmin(ctx.session.user.email))
+  ) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "The Durchgang is not part of this plan.",
+    });
+  }
+  if (!signedInJustNow(ctx.session.authTime)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "reauth" });
+  }
+}
+
+/**
+ * Throws when the person switched company in another tab after the page loaded: the key or code
+ * would work in a company the page did not name.
+ */
+function sameCompany(ctx: { readonly companyId: string }, shown: string): void {
+  if (shown !== ctx.companyId) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: "The company changed in another tab. Reload the page.",
+    });
+  }
+}
+
+/**
+ * Throws unless the company's admin has let its people connect assistants
+ * (`company.assistants_allowed`); "assistants_off" tells the page to say so.
+ */
+async function companyAllowsAssistants(ctx: {
+  readonly db: DbOrTx;
+  readonly companyId: string;
+}): Promise<void> {
+  if (!(await assistantsAllowed(ctx.db, ctx.companyId))) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "assistants_off" });
+  }
+}
+
+/**
+ * Tells the person, by mail, that an assistant was connected as them: a key or an assistant's
+ * sign-in outlives the browser session, so one made by someone else holding that session is seen
+ * and can be ended in Settings. Never holds up or fails the connection itself.
+ */
+function noticeAssistantConnected(
+  ctx: {
+    readonly db: DbOrTx;
+    readonly companyId: string;
+    readonly session: { readonly user: { readonly email?: string | null } };
+  },
+  how: Parameters<typeof assistantConnectedEmail>[0]["how"],
+): void {
+  const email = ctx.session.user.email;
+  if (!email) return;
+  const send = async () => {
+    const [locale, row] = await Promise.all([
+      accountEmailLocale(email),
+      ctx.db.query.company.findFirst({
+        where: eq(company.id, ctx.companyId),
+        columns: { name: true },
+      }),
+    ]);
+    const content = await assistantConnectedEmail({
+      companyName: row?.name ?? "",
+      how,
+      settingsUrl: `${getAppUrl()}${getPathname({ href: "/settings", locale })}`,
+      locale,
+    });
+    await sendMail({ emailType: "account.assistant_connected", to: email, ...content });
+  };
+  send().catch((err) => console.error("[mcp] assistant notice not sent", err));
+}
 
 /** The account's own address and language from the database, not the session snapshot. */
 const ownAccount = async (db: DbOrTx, userId: string) => {

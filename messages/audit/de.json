@@ -6,6 +6,7 @@
     "today": "Heute",
     "yesterday": "Gestern",
     "system": "System",
+    "viaAssistant": "über {client}",
     "actions": {
       "durchgang": {
         "item_done": "Punkt im Durchgang ausgefüllt",
@@ -16,7 +17,12 @@
         "approvePolicies": "Dokumente freigegeben",
         "requirements_signed": "Von der Geschäftsführung freigegeben",
         "adopted": "Methode übernommen",
-        "adoptMethod": "Methode übernommen"
+        "adoptMethod": "Methode übernommen",
+        "resume": "Punkt wieder aufgenommen",
+        "resumed": "Punkt wieder aufgenommen"
+      },
+      "supplier": {
+        "create": "Lieferant angelegt"
       },
       "assessment": {
         "signOff": "Anforderung freigegeben",
@@ -45,7 +51,15 @@
         "setMode": "Ansicht des Wegs gewechselt"
       },
       "user": {
-        "dismissHint": "Hinweis geschlossen"
+        "dismissHint": "Hinweis geschlossen",
+        "createMcpKey": "Schlüssel für Assistenten erzeugt",
+        "allowMcpClient": "Assistent erlaubt",
+        "disconnectMcp": "Alle Assistenten getrennt",
+        "endMcpConnection": "Assistent getrennt"
+      },
+      "mcp": {
+        "connected": "Assistent verbunden",
+        "item_filled": "Punkt im Durchgang von einem Assistenten ausgefüllt"
       },
       "notification": {
         "scheduled": "Erinnerungen an Fristen geplant"

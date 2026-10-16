@@ -8,18 +8,12 @@
  *
  * Fire-and-forget: callers should `.catch(() => {})`.
  */
-import { eq, and, sql, inArray } from "drizzle-orm";
-import {
-  companyRequirementStatus,
-  requirement,
-} from "@/schema";
+import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { logAudit } from "@/lib/audit";
 import type { DbOrTx } from "@/lib/db";
+import { companyRequirementStatus, requirement } from "@/schema";
 import { getNis2AssessmentIds } from "@/server/trpc/helpers/nis2-scope";
-import {
-  COMPANY_SCOPED_MODULE_TABLES,
-  CUSTOM_COUNT_MODULES,
-} from "./module-tables";
+import { COMPANY_SCOPED_MODULE_TABLES, type CUSTOM_COUNT_MODULES } from "./module-tables";
 
 type CountFn = (db: DbOrTx, companyId: string) => Promise<number>;
 
@@ -28,7 +22,7 @@ const TABLE_COUNT_SQL: Record<string, CountFn> = {};
 function registerTable(name: string) {
   TABLE_COUNT_SQL[name] = async (db, companyId) => {
     const result = await db.execute<{ cnt: number }>(
-      sql`SELECT count(*)::int as cnt FROM ${sql.identifier(name)} WHERE company_id = ${companyId}`
+      sql`SELECT count(*)::int as cnt FROM ${sql.identifier(name)} WHERE company_id = ${companyId}`,
     );
     return result.rows[0]?.cnt ?? 0;
   };
@@ -49,7 +43,7 @@ const CUSTOM_COUNTERS: Record<(typeof CUSTOM_COUNT_MODULES)[number], CountFn> = 
   // Team members are `user` rows, not a `team` table.
   team: async (db, companyId) => {
     const result = await db.execute<{ cnt: number }>(
-      sql`SELECT count(*)::int as cnt FROM "user" WHERE company_id = ${companyId}`
+      sql`SELECT count(*)::int as cnt FROM "user" WHERE company_id = ${companyId}`,
     );
     return result.rows[0]?.cnt ?? 0;
   },
@@ -59,7 +53,7 @@ const CUSTOM_COUNTERS: Record<(typeof CUSTOM_COUNT_MODULES)[number], CountFn> = 
       sql`SELECT count(DISTINCT r.id)::int as cnt
           FROM bsi_incident_report r
           JOIN incident i ON r.incident_id = i.id
-          WHERE i.company_id = ${companyId}`
+          WHERE i.company_id = ${companyId}`,
     );
     return result.rows[0]?.cnt ?? 0;
   },
@@ -73,20 +67,38 @@ interface RevertContext {
   companyId: string;
   userId: string | null;
   reason: "module_data_changed" | "module_data_deleted";
+  /** When the data changed: only a signature older than that was given on the old data. */
+  changedAt: Date;
 }
 
-async function revertSignOffs(
+/**
+ * A sign-off given before this moment, or one with no sign-off time on record (rows signed before
+ * the column, or set by hand). A signature given after the change was given on the changed data,
+ * so the change does not take it back: the recheck runs in the background, after the save, and
+ * management signing in between was withdrawn although nothing changed after it.
+ */
+const signedBefore = (changedAt: Date) =>
+  or(
+    isNull(companyRequirementStatus.signedOffAt),
+    lt(companyRequirementStatus.signedOffAt, changedAt),
+  );
+
+/**
+ * The company's signed-off NIS 2 requirements that reference this module: the ones a change to its
+ * data reverts. An AI assistant reads them before adding a row (lib/mcp), so it never reverts one.
+ */
+export async function signedOffByModule(
   db: DbOrTx,
+  companyId: string,
   moduleRef: string,
-  ctx: RevertContext,
-): Promise<void> {
+) {
   // NIS 2 only. Unscoped, an operational-module edit reverted hidden GDPR /
   // AI Act / CRA sign-offs too and wrote their codes into the audit-log entry
   // the user reads on /audit ("reverted 7 requirement(s): NIS2-2.1, DSGVO-30, ...").
-  const assessmentIds = await getNis2AssessmentIds(db, ctx.companyId);
-  if (assessmentIds.length === 0) return;
+  const assessmentIds = await getNis2AssessmentIds(db, companyId);
+  if (assessmentIds.length === 0) return [];
 
-  const toRevert = await db
+  return db
     .select({
       statusId: companyRequirementStatus.id,
       previousStatus: companyRequirementStatus.status,
@@ -101,23 +113,50 @@ async function revertSignOffs(
         eq(requirement.moduleRef, moduleRef),
       ),
     );
+}
 
+async function revertSignOffs(
+  db: DbOrTx,
+  moduleRef: string,
+  ctx: RevertContext,
+): Promise<void> {
+  const toRevert = await signedOffByModule(db, ctx.companyId, moduleRef);
   if (toRevert.length === 0) return;
 
-  await db
-    .update(companyRequirementStatus)
-    .set({
-      status: "needs_review",
-      updatedAt: new Date(),
-    })
-    .where(inArray(companyRequirementStatus.id, toRevert.map((r) => r.statusId)));
+  // Read and revert in one statement's conditions: a row signed again between the two keeps the
+  // new signature, and the audit entry names only the rows this update actually reverted.
+  const revertedIds = new Set(
+    (
+      await db
+        .update(companyRequirementStatus)
+        .set({
+          status: "needs_review",
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            inArray(
+              companyRequirementStatus.id,
+              toRevert.map((r) => r.statusId),
+            ),
+            inArray(companyRequirementStatus.status, ["completed", "approved"]),
+            signedBefore(ctx.changedAt),
+          ),
+        )
+        .returning({ id: companyRequirementStatus.id })
+    ).map((r) => r.id),
+  );
+  if (revertedIds.size === 0) return;
 
-  const reverted = toRevert.map((r) => ({
-    code: r.requirementCode,
-    statusId: r.statusId,
-    previousStatus: r.previousStatus,
-  }));
-  const reasonText = ctx.reason === "module_data_changed" ? "data changed" : "data deleted (empty)";
+  const reverted = toRevert
+    .filter((r) => revertedIds.has(r.statusId))
+    .map((r) => ({
+      code: r.requirementCode,
+      statusId: r.statusId,
+      previousStatus: r.previousStatus,
+    }));
+  const reasonText =
+    ctx.reason === "module_data_changed" ? "data changed" : "data deleted (empty)";
   logAudit({
     companyId: ctx.companyId,
     userId: ctx.userId,
@@ -146,11 +185,14 @@ export async function invalidateModuleSignOffs(
   moduleRef: string,
   userId?: string | null,
 ): Promise<void> {
+  // Read before anything waits: callers fire this right after their write has landed.
+  const changedAt = new Date();
   if (!companyId) return;
   return revertSignOffs(db, moduleRef, {
     companyId,
     userId: userId ?? null,
     reason: "module_data_changed",
+    changedAt,
   });
 }
 
@@ -164,6 +206,7 @@ export async function recheckModuleRequirements(
   moduleRef: string,
   userId?: string | null,
 ): Promise<void> {
+  const changedAt = new Date();
   if (!companyId) return;
 
   const countFn = TABLE_COUNT_SQL[moduleRef];
@@ -176,5 +219,6 @@ export async function recheckModuleRequirements(
     companyId,
     userId: userId ?? null,
     reason: "module_data_deleted",
+    changedAt,
   });
 }

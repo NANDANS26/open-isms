@@ -6,6 +6,7 @@
     "today": "Today",
     "yesterday": "Yesterday",
     "system": "System",
+    "viaAssistant": "via {client}",
     "actions": {
       "durchgang": {
         "item_done": "Walkthrough item filled in",
@@ -16,7 +17,12 @@
         "approvePolicies": "Documents approved",
         "requirements_signed": "Signed off by management",
         "adopted": "Method adopted",
-        "adoptMethod": "Method adopted"
+        "adoptMethod": "Method adopted",
+        "resume": "Item picked up again",
+        "resumed": "Item picked up again"
+      },
+      "supplier": {
+        "create": "Supplier added"
       },
       "assessment": {
         "signOff": "Requirement signed off",
@@ -45,7 +51,15 @@
         "setMode": "Journey view changed"
       },
       "user": {
-        "dismissHint": "Hint dismissed"
+        "dismissHint": "Hint dismissed",
+        "createMcpKey": "Key for assistants created",
+        "allowMcpClient": "Assistant allowed",
+        "disconnectMcp": "All assistants disconnected",
+        "endMcpConnection": "Assistant disconnected"
+      },
+      "mcp": {
+        "connected": "Assistant connected",
+        "item_filled": "Walkthrough item filled in by an assistant"
       },
       "notification": {
         "scheduled": "Deadline reminders scheduled"

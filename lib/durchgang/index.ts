@@ -121,10 +121,12 @@ export {
   askedFields,
   BACKUP_FREQUENCIES,
   HOSTINGS,
+  inAudience,
   MANAGEMENT_ROLE,
   MFA_METHODS,
   POLICY_LISTS,
   POLICY_TEMPLATES,
+  TRAINING_ROW,
   WALK_LOCALES,
   walkLocaleOf,
 } from "./types";

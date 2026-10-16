@@ -8,6 +8,7 @@ import type { Provider } from "next-auth/providers";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { cache } from "react";
+import { revokedByCredentialChange } from "@/lib/auth/credential-change";
 import { checkEmailQuality } from "@/lib/auth/email-quality";
 import {
   decideGoogleLink,
@@ -31,7 +32,7 @@ import { env } from "@/lib/env";
 import { isLocaleCode, LOCALE_COOKIE, type LocaleCode } from "@/lib/locale";
 import { newUserSignupEmail, sendMail, sendWelcomeEmail } from "@/lib/mail";
 import { resolveEmailLocale } from "@/lib/mail/locale";
-import { resolveHints } from "@/lib/onboarding/hints";
+import { NO_HINTS, resolveHints } from "@/lib/onboarding/hints";
 import { rateLimit } from "@/lib/rate-limit";
 import { billingAccount, company, companyMembership, user } from "@/schema";
 import { createDraftCompany } from "@/server/trpc/helpers/setup-helpers";
@@ -211,8 +212,8 @@ async function admitGoogleAccount(google: {
             // reset does (audit M-1). The jwt callback runs after this one
             // and re-reads sessionVersion, so THIS sign-in is stamped with
             // the incremented value and stays valid; only tokens issued
-            // before the change are rejected.
-            sessionVersion: sql`${user.sessionVersion} + 1`,
+            // before the change are rejected. Assistants' keys end with it.
+            ...revokedByCredentialChange(),
           }
         : {}),
       // A pending-verify account whose owner chose Google over the email code.
@@ -562,13 +563,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.sessionVersion = token.sessionVersion ?? null;
       session.authTime = token.authTime ?? null;
       session.accountId = token.accountId ?? null;
-      session.hints = {
-        journeyTourGuided: false,
-        journeyTourTeam: false,
-        requirementTour: false,
-        helpOffer: false,
-        journeyNotice: false,
-      };
+      session.hints = { ...NO_HINTS };
       return session;
     },
   },
@@ -594,6 +589,33 @@ const openMembership = async (userId: string, companyId: string) => {
     .limit(1);
   return row;
 };
+
+export type CompanySession = Pick<
+  Session,
+  "companyId" | "role" | "jobTitle" | "companyActivated" | "accessLevel"
+>;
+
+/**
+ * The company part of a session, for a sign-in and for an AI assistant's key alike (lib/mcp).
+ * The role and the compliance role come from the membership in the company, and activation is
+ * resolved once here so every gate reads session.companyActivated (a draft shell has a company
+ * but no activatedAt). A company without a membership gets no company and the least role rather
+ * than a guess.
+ */
+export async function companySession(
+  userId: string,
+  companyId: string | null,
+  grandfathered: boolean,
+): Promise<CompanySession> {
+  const open = companyId ? await openMembership(userId, companyId) : undefined;
+  return {
+    companyId: open ? companyId : null,
+    role: open?.role ?? "member",
+    jobTitle: open?.jobTitle ?? null,
+    companyActivated: open?.activatedAt != null,
+    accessLevel: open ? effectiveAccessLevel(open.accessLevel, grandfathered) : null,
+  };
+}
 
 /**
  * Get the current session with fresh id/companyId/role from DB, and
@@ -652,20 +674,10 @@ export const getSession = cache(async (): Promise<Session | null> => {
   // cost no extra round trip on any page that renders them.
   session.hints = resolveHints(dbUser);
 
-  // The role and the compliance role come from the membership in the open company, and activation is
-  // resolved once here so every gate reads session.companyActivated (a draft
-  // shell has a company but no activatedAt). An open company without a
-  // membership gets no company and the least role rather than a guess.
-  const open = dbUser.companyId
-    ? await openMembership(dbUser.id, dbUser.companyId)
-    : undefined;
-  session.companyId = open ? dbUser.companyId : null;
-  session.role = open?.role ?? "member";
-  session.jobTitle = open?.jobTitle ?? null;
-  session.companyActivated = open?.activatedAt != null;
-  session.accessLevel = open
-    ? effectiveAccessLevel(open.accessLevel, dbUser.grandfatheredAt !== null)
-    : null;
+  Object.assign(
+    session,
+    await companySession(dbUser.id, dbUser.companyId, dbUser.grandfatheredAt !== null),
+  );
 
   return session;
 });

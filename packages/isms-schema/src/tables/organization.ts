@@ -143,6 +143,13 @@ export const company = pgTable("company", {
 
   // AI settings
   aiDataSharing: aiDataSharingEnum("ai_data_sharing").default("none").notNull(),
+  /**
+   * Whether the company's people may connect their own AI assistants (lib/mcp), which then read
+   * and fill the walkthrough with the company's data. The company's decision, so only an admin
+   * sets it, and off until one does: checked when a key is made or an assistant allowed, and on
+   * every call, so turning it off stops every connected assistant at once.
+   */
+  assistantsAllowed: boolean("assistants_allowed").default(false).notNull(),
 
   /**
    * Journey layout. Nullable on purpose: NULL means nobody has answered yet,
@@ -380,6 +387,13 @@ export const user = pgTable(
      * stay valid until first rotation.
      */
     sessionVersion: integer("session_version").default(1).notNull(),
+    /**
+     * Revocation counter of the person's keys for AI assistants (MCP, lib/mcp/key.ts). Stamped
+     * into each key; a key whose version no longer matches is refused. Making a new key or
+     * disconnecting every assistant bumps it. Apart from sessionVersion so that revoking a key
+     * does not sign the person out of the app.
+     */
+    mcpKeyVersion: integer("mcp_key_version").default(1).notNull(),
     /**
      * Completed sign-ins, incremented once per sign-in in the NextAuth `jwt`
      * callback. That hook receives a `user` argument only when a session is

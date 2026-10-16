@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { AllMessagesProvider } from "@/components/AllMessagesProvider";
 import { CompanySetup } from "@/components/organization/CompanySetup";
 import { PortalShell } from "@/components/portal/PortalShell";
@@ -12,6 +12,7 @@ import {
   OFFER_PATH,
   ORDER_PATHS,
 } from "@/lib/billing/access";
+import { isConsentPath } from "@/lib/mcp/consent-path";
 import { WALK_HOME_PATHS } from "@/lib/walkthrough";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
@@ -29,7 +30,10 @@ export default async function PortalLayout({ children }: { children: React.React
   // The walk's home opens to an unpaid account too, locked, with the way to order (Simon,
   // 03.10.2026). Its items stay closed (the walk's own gate).
   const walkHome = WALK_HOME_PATHS.includes(pathname);
-  if (mustOrder && !mayOpenPortalPath("free", pathname) && !walkHome) {
+  // An assistant's sign-in too: its page says the walkthrough is locked, with the way there, where
+  // the offer would drop the assistant's request unexplained. Allowing stays refused server side.
+  const consent = isConsentPath(pathname);
+  if (mustOrder && !mayOpenPortalPath("free", pathname) && !walkHome && !consent) {
     localeRedirect({ href: OFFER_PATH, locale: await getLocale() });
   }
 
@@ -62,11 +66,17 @@ export default async function PortalLayout({ children }: { children: React.React
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
   const showSetup = !session.companyActivated && needsCompany;
+  // An assistant's sign-in reaches a company not set up yet too: the form then says why it is
+  // there and that the consent follows on the same page once the company is saved.
+  const setupLead =
+    showSetup && consent
+      ? (await getTranslations("settings.mcp.connect"))("setupFirst")
+      : undefined;
 
   return (
     <AllMessagesProvider>
       <PortalShell session={session}>
-        {showSetup ? <CompanySetup /> : children}
+        {showSetup ? <CompanySetup lead={setupLead} /> : children}
       </PortalShell>
     </AllMessagesProvider>
   );
