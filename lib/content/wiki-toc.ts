@@ -185,6 +185,14 @@ export interface WikiTocEntry {
    * "simon-orzel" when omitted.
    */
   authorSlug?: "simon-orzel" | "cory-hisey";
+
+  /**
+   * The German-slug wiki path this page's content was merged into, with an
+   * optional section id. A moved entry keeps its slugs so every URL it was
+   * indexed under still resolves: it leaves the hub, category lists and the
+   * sitemap, and each localized URL 308s to the same-language target.
+   */
+  movedTo?: { path: `/wiki/${string}`; anchor?: string };
 }
 
 export interface WikiCategoryMeta {
@@ -270,6 +278,7 @@ export const WIKI_TOC: Record<WikiTopLevel, WikiCategoryMeta> = {
         titleEn: "NIS 2 across multiple EU countries",
         summaryDe: "Konzern mit Niederlassungen in mehreren Mitgliedstaaten — wo registrieren, wer ist zuständig?",
         summaryEn: "Group with branches in multiple member states — where to register, who supervises?",
+        movedTo: { path: "/wiki/zeit-und-status/nis2-umsetzung-europa" },
       },
       {
         slug: "konzern-it-msp",
@@ -637,6 +646,7 @@ export const WIKI_TOC: Record<WikiTopLevel, WikiCategoryMeta> = {
         titleEn: "NIS 2 registration portals across the EU",
         summaryDe: "Die nationalen Registrierungsstellen aller Mitgliedstaaten.",
         summaryEn: "National registration authorities across all member states.",
+        movedTo: { path: "/wiki/zeit-und-status/nis2-umsetzung-europa", anchor: "portals" },
       },
       {
         slug: "kosten",
@@ -1188,9 +1198,9 @@ for (const cat of WIKI_TOP_LEVEL) {
 
 // ── Derivation helpers ──────────────────────────────────────────────
 
-/** All entries in a category, filtered to those whose publishAt has elapsed (or who have no publishAt). */
+/** All entries in a category, filtered to those whose publishAt has elapsed (or who have no publishAt) and that have not moved. */
 export function publishedEntries(cat: WikiTopLevel): WikiTocEntry[] {
-  return WIKI_TOC[cat].entries.filter((e) => isPublished(e.slug));
+  return WIKI_TOC[cat].entries.filter((e) => !e.movedTo && isPublished(e.slug));
 }
 
 /**
