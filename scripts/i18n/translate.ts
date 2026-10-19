@@ -20,25 +20,20 @@
  *     The wiki is curated/localised, not bulk-translated. See assessment §6.
  */
 
-import { readFile, writeFile, readdir } from "fs/promises";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import { readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { z } from "zod";
+import { glossaryPromptBlock } from "./glossary";
+import { listNamespaces, MESSAGES_DIR } from "./namespaces";
 import {
-  SOURCE_LOCALE,
-  TARGET_LOCALES,
-  TRANSLATION_MODEL,
-  WIKI_NAMESPACE,
   getTargetLocale,
   localesForWave,
+  SOURCE_LOCALE,
+  TARGET_LOCALES,
   type TargetLocale,
+  TRANSLATION_MODEL,
+  WIKI_NAMESPACE,
 } from "./plan";
-import { glossaryPromptBlock } from "./glossary";
-
-const MESSAGES_DIR = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../messages",
-);
 
 const CHUNK_SIZE = 60; // strings per model call
 const CONCURRENCY = 4; // concurrent model calls
@@ -209,14 +204,6 @@ async function mapLimit<T, R>(
 // Namespace + file helpers
 // ---------------------------------------------------------------------------
 
-async function listNamespaces(): Promise<string[]> {
-  const entries = await readdir(MESSAGES_DIR, { withFileTypes: true });
-  return entries
-    .filter((e) => e.isDirectory())
-    .map((e) => e.name)
-    .sort();
-}
-
 async function readJson(path: string): Promise<Json> {
   const raw = await readFile(path, "utf-8");
   return JSON.parse(raw) as Json;
@@ -349,7 +336,7 @@ async function translateNamespace(
   }
 
   const output = rebuild(source, translated, { i: 0 });
-  await writeFile(targetPath, JSON.stringify(output, null, 2) + "\n", "utf-8");
+  await writeFile(targetPath, `${JSON.stringify(output, null, 2)}\n`, "utf-8");
   console.log(
     `  wrote ${locale.code}/${namespace} (${strings.length} strings${
       drift ? `, ${drift} placeholder warnings` : ""
