@@ -222,7 +222,7 @@ export const craNis2SatisfactionPairs: SatisfactionPair[] = [
   [
     "CRA-VLN.3",
     "6.4",
-    "Security updates without delay align with the NIS2 patch management cadence.",
+    "The maker issues updates; 6.4 has the entity install them. No shared record.",
   ],
   [
     "CRA-INC.1",
@@ -232,12 +232,12 @@ export const craNis2SatisfactionPairs: SatisfactionPair[] = [
   [
     "CRA-INC.2",
     "3.3",
-    "Same underlying event, separate filings: CRA Art. 14 notifies the exploited product vulnerability to the CSIRT coordinator and ENISA, NIS2 §32 notifies the entity's own significant incident to the BSI.",
+    "Same event, separate filings: CRA Art. 14(2)(b) notifies the exploited product vulnerability to the CSIRT coordinator and ENISA, NIS2 Art. 23(4)(b) the entity's own significant incident to its CSIRT.",
   ],
   [
     "CRA-INC.3",
     "3.5",
-    "CRA 14-day final report and the NIS2 post-incident review share root-cause evidence; the NIS2 final report to the BSI is §32(1) Nr. 4, tracked under 3.3.",
+    "The CRA 14-day report (Art. 14(2)(c)) names the fix, not a root cause; the fix feeds the NIS2 post-incident review. NIS2's final report (Art. 23(4)(d)) is 3.3.",
   ],
   [
     "CRA-IMP.1",
@@ -252,13 +252,12 @@ export const craNis2SatisfactionPairs: SatisfactionPair[] = [
   [
     "CRA-MFG.1",
     "2.1",
-    "Per-product cybersecurity risk assessment reuses the methodology defined for NIS2 risk management (CIR 2.1).",
-    "equivalent",
+    "The per-product assessment can reuse the 2.1 method, but Art. 13(3) analyses each product's use.",
   ],
   [
     "CRA-MFG.2",
     "2.4",
-    "Management body sign-off on CRA risk assessment overlaps with the CEO sign-off NIS2 risk treatment plan requires.",
+    "Our practice: the CRA wants no sign-off on Art. 13(5) due diligence; management signs it here, as for 2.4.",
   ],
 ];
 
@@ -266,12 +265,12 @@ export const craAiActSatisfactionPairs: SatisfactionPair[] = [
   [
     "CRA-ESS.1",
     "AI-RSK.1",
-    "Essential cybersecurity requirements (Annex I) overlap with AI risk management for high-risk AI systems with embedded digital elements. CRA Art. 12 grants presumption of conformity with AI Act Art. 15 (accuracy, robustness, cybersecurity) only; it does not reach the Art. 9 risk management system AI-RSK.1 tracks.",
+    "Essential cybersecurity requirements (Annex I) overlap with AI risk management for high-risk AI systems with embedded digital elements. CRA Art. 12(1) deems them to meet AI Act Art. 15 on cybersecurity, not on accuracy or robustness; it does not reach the Art. 9 risk management system AI-RSK.1 tracks.",
   ],
   [
     "CRA-DOC.1",
     "AI-DOC.1",
-    "Annex VII technical documentation overlaps with AI Act Annex IV for products that are both PDE and high-risk AI.",
+    "For a product that is also high-risk AI, CRA Art. 31(3) wants one technical file with Annex VII and AI Act Annex IV.",
   ],
   [
     "CRA-INC.1",
@@ -281,7 +280,7 @@ export const craAiActSatisfactionPairs: SatisfactionPair[] = [
   [
     "CRA-DOC.1",
     "AI-DOC.2",
-    "Annex VII technical documentation includes the logging and traceability evidence Art. 12 AI Act requires.",
+    "Annex VII holds no logging evidence; the AI Act Art. 12 logs are a capability of the system itself.",
   ],
 ];
 
