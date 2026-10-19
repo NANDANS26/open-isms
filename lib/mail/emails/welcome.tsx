@@ -43,13 +43,15 @@ export const WELCOME_COPY: Record<
 > = {
   en: {
     subject: "Welcome to NISD2",
-    preview: "Thanks for signing up. A good first step is the CEO management training.",
+    preview:
+      "Thanks for signing up. A good first step is the free CEO and management course.",
     hello: (firstName) => (firstName ? `Hey ${firstName},` : "Hey,"),
     thanks: "welcome to NISD2. Thanks for signing up.",
     course: {
-      before: "A good first step is the ",
-      link: "CEO management training",
-      href: "https://nisd2.eu/training/courses/nis2-ceo",
+      before: "A good first step is the free ",
+      link: "CEO and management course",
+      // The course's public page: the course itself asks a reader who is not signed in to sign in.
+      href: "https://nisd2.eu/en/training/nis2-ceo",
       after: ".",
     },
     questionsWithCall: {
@@ -65,13 +67,13 @@ export const WELCOME_COPY: Record<
   cs: {
     subject: "Vítejte v NISD2",
     preview:
-      "Děkujeme za registraci. Dobrým prvním krokem je školení pro vedení společnosti.",
+      "Děkujeme za registraci. Dobrým prvním krokem je bezplatné školení pro vedení společnosti.",
     hello: () => "Dobrý den,",
     thanks: "vítejte v NISD2. Děkujeme za registraci.",
     course: {
-      before: "Dobrým prvním krokem je ",
+      before: "Dobrým prvním krokem je bezplatné ",
       link: "Školení NIS2 pro vedení společnosti",
-      href: "https://nisd2.eu/cs/training/courses/nis2-ceo",
+      href: "https://nisd2.eu/cs/training/nis2-ceo",
       after:
         ". Vysvětluje, co NIS 2 skutečně požaduje od vedení, a zabere asi 4 hodiny. Jako doklad o povinném školení vrcholného vedení (vyhláška č. 410/2025 Sb., § 4 písm. b); vyhláška č. 409/2025 Sb., § 4 odst. 1 písm. a)) uznává NÚKIB certifikát svého kurzu pro vrcholné vedení na osveta.nukib.gov.cz.",
     },
