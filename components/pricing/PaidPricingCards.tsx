@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { SignInLink } from "@/components/auth/SignInLink";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,17 +31,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { getPathname, Link } from "@/i18n/navigation";
-import { formatWholeEuro } from "@/lib/billing/order";
 import { cn } from "@/lib/utils";
 import { BookingLink } from "./BookingLink";
 import { callHostNames, FOUNDERS } from "./founders";
+import { gapAnalysisRange } from "./gap-analysis-prices";
 
 // Every line is checked against the code or the AGB. "Deadlines and reminders" means the in-app
 // reminders the nightly cron schedules; deadline digests by email go out only when an operator
-// presses send (lib/mail/digest-outbox.ts), so the list does not promise email.
+// presses send (lib/mail/digest-outbox.ts), so the list does not promise email. "MCP server" is
+// paid only: the consent page, Settings and every MCP request check mayWalkDurchgang, and the
+// assistant cannot finish or approve an item (lib/mcp).
 const freeFeatures = ["courses", "wiki", "tools"] as const;
 const paidFeatures = [
   "guided",
+  "mcp",
   "unlimited",
   "history",
   "deadlines",
@@ -51,6 +54,11 @@ const paidFeatures = [
 ] as const;
 
 const PAID_CARD_ID = "durchgang";
+
+// Wiki pages join the routing table at runtime (wikiPathnames), so their paths are missing from
+// the typed list of static routes; the routing still translates this one per locale.
+type Href = ComponentProps<typeof Link>["href"];
+const MCP_WIKI_PAGE = "/wiki/ki-assistenten/was-der-assistent-ausfuellt" as Href;
 
 // From the LICENSE files and package.json licence fields (the README's table is older than
 // they are). `spdx` is shown as is; the other two rows carry translated wording.
@@ -67,21 +75,6 @@ const LICENCES = [
   },
   { key: "courses", packages: ["courses/"], spdx: null },
 ] as const;
-
-/**
- * Published one-off prices for a NIS 2 gap analysis, each from the provider's own page: cyberkom
- * 2.000 fixed (up to 500 staff), ing-ism from 3.900 and from 6.900, Blackfort "Gap" from 4.900,
- * DATAGROUP 4.990, secunet from 5.000. Blackfort's 8.500 tier adds a roadmap and is left out.
- * Most are starting prices, which the copy says; most pages do not say net, so the copy does not.
- * A price comparison must be verifiable (§ 6 Abs. 2 Nr. 2 UWG), so the sources are named on the
- * page, and a stale one misleads (§ 5 UWG): re-check every quarter and move `checked`.
- */
-const GAP_ANALYSIS_PRICES = {
-  lowCents: 200_000,
-  highCents: 690_000,
-  sources: ["cyberkom", "ing-ism", "Blackfort", "DATAGROUP", "secunet"],
-  checked: "2026-10-04",
-} as const;
 
 const moneyBackPoints = ["first", "cancel", "refund", "data"] as const;
 const unlimitedPoints = ["structure", "users", "payment"] as const;
@@ -195,19 +188,6 @@ export function MoneyBackBadge() {
 }
 
 /** The published gap analysis range, its sources and the day it was checked, for one locale. */
-export const gapAnalysisRange = (locale: string) => ({
-  low: formatWholeEuro(GAP_ANALYSIS_PRICES.lowCents, locale),
-  high: formatWholeEuro(GAP_ANALYSIS_PRICES.highCents, locale),
-  sources: new Intl.ListFormat(locale, { type: "conjunction" }).format(
-    GAP_ANALYSIS_PRICES.sources,
-  ),
-  checked: new Intl.DateTimeFormat(locale, {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${GAP_ANALYSIS_PRICES.checked}T12:00:00Z`)),
-});
-
 /**
  * The list price set against what a gap analysis alone costs; hover or focus gives the published
  * range. "For the price of", never "cheaper than": the low end of the range is below our price.
@@ -403,6 +383,14 @@ export function PaidFeatureList() {
                 />
               </InfoPanel>
             </Tooltip>
+          ) : key === "mcp" ? (
+            t.rich("paid.features.mcp", {
+              mcp: (chunks) => (
+                <Link href={MCP_WIKI_PAGE} className={externalLink}>
+                  {chunks}
+                </Link>
+              ),
+            })
           ) : (
             t(`paid.features.${key}`)
           )}
