@@ -280,7 +280,7 @@ test("reopen: withdrawing a sign-off clears the attestation and keeps the histor
   await expect(page.getByTestId("sign-off-button")).toBeVisible({ timeout: 20_000 });
 });
 
-test("cross-framework carry-over credits the linked ISO requirement", async () => {
+test("cross-framework carry-over credits the linked requirement on the same record", async () => {
   const pairs = await e2eQuery<{ n: string }>(
     `SELECT count(*)::text AS n FROM requirement_satisfaction`,
   );
@@ -289,7 +289,8 @@ test("cross-framework carry-over credits the linked ISO requirement", async () =
     "requirement_satisfaction is empty in the default seed — carry-over is dormant (recorded coverage gap; seeding the NIS2<->ISO pairs is a product decision)",
   );
 
-  // When pairs exist: signing SINGLE_TARGET must credit its linked pair.
+  // When pairs exist: signing SINGLE_TARGET must credit what it shares the
+  // same record with. A partial overlap credits nothing (satisfactionTargets).
   const credited = await e2eQuery<{ status: string }>(
     `SELECT s.status
        FROM requirement_satisfaction rs
@@ -297,7 +298,8 @@ test("cross-framework carry-over credits the linked ISO requirement", async () =
        JOIN requirement_category rc ON rc.id = src.category_id
        JOIN compliance_framework f ON f.id = rc.framework_id AND f.code = 'nis2'
        JOIN requirement dst ON dst.id IN (rs.requirement_a_id, rs.requirement_b_id) AND dst.id <> src.id
-       JOIN company_requirement_status s ON s.requirement_id = dst.id`,
+       JOIN company_requirement_status s ON s.requirement_id = dst.id
+      WHERE rs.equivalence_kind = 'equivalent'`,
     [SINGLE_TARGET],
   );
   for (const row of credited) {
