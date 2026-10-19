@@ -77,11 +77,11 @@
       "description": "Maßnahmen zum Schutz von Assets, auf die Lieferanten zugreifen können, identifizieren und umsetzen; in Lieferantenvereinbarungen dokumentieren."
     },
     "A_5_20": {
-      "title": "IS-Anforderungen in Lieferantenvereinbarungen",
+      "title": "Informationssicherheit in Lieferantenvereinbarungen",
       "description": "Informationssicherheitsanforderungen mit jedem Lieferanten vereinbaren, der auf Organisationsinformationen zugreift oder diese verarbeitet."
     },
     "A_5_21": {
-      "title": "IS im IKT-Lieferketten-Management",
+      "title": "Informationssicherheit in der Lieferkette für IKT",
       "description": "Prozesse zur Steuerung von IS-Risiken in der IKT-Produkte- und Dienstleistungslieferkette definieren und umsetzen."
     },
     "A_5_22": {
@@ -89,15 +89,15 @@
       "description": "IS-Praktiken und Leistungserbringung von Lieferanten regelmäßig überwachen, überprüfen und Änderungen verwalten."
     },
     "A_5_23": {
-      "title": "Informationssicherheit bei der Nutzung von Cloud-Diensten",
+      "title": "Informationssicherheit bei der Nutzung von Clouddiensten",
       "description": "Prozesse für Beschaffung, Nutzung, Verwaltung und Beendigung von Cloud-Diensten inkl. Sicherheitsanforderungen und Exit-Plänen etablieren."
     },
     "A_5_24": {
-      "title": "Planung und Vorbereitung des IS-Incident-Managements",
+      "title": "Planung und Vorbereitung der Behandlung von Sicherheitsvorfällen",
       "description": "Incident Management mit definierten Rollen, Verantwortlichkeiten, Verfahren und Kommunikationskanälen planen und vorbereiten."
     },
     "A_5_25": {
-      "title": "Bewertung und Entscheidung über IS-Ereignisse",
+      "title": "Bewertung von Sicherheitsereignissen und Entscheidung darüber",
       "description": "IS-Ereignisse bewerten und anhand eines definierten Klassifizierungsschemas entscheiden, ob sie als Vorfälle einzustufen sind."
     },
     "A_5_26": {
@@ -105,7 +105,7 @@
       "description": "Auf Vorfälle gemäß dokumentierten Verfahren reagieren; strukturiert eindämmen, beseitigen und wiederherstellen."
     },
     "A_5_27": {
-      "title": "Lernen aus IS-Vorfällen",
+      "title": "Lernen aus Sicherheitsvorfällen",
       "description": "Erkenntnisse aus Vorfällen nutzen, um Wahrscheinlichkeit und Auswirkungen künftiger Vorfälle zu reduzieren; Maßnahmen entsprechend aktualisieren."
     },
     "A_5_28": {
@@ -117,7 +117,7 @@
       "description": "Planen, wie IS bei Störungen aufrechterhalten wird. Sicherheitsanforderungen in Betriebskontinuitätspläne integrieren."
     },
     "A_5_30": {
-      "title": "IKT-Bereitschaft für Betriebskontinuität",
+      "title": "Bereitschaft der IKT für die Betriebskontinuität",
       "description": "IKT-Bereitschaft basierend auf Betriebskontinuitätszielen planen, umsetzen, pflegen und testen."
     },
     "A_5_31": {
@@ -141,7 +141,7 @@
       "description": "ISMS-Ansatz und -Umsetzung in geplanten Abständen oder bei wesentlichen Änderungen unabhängig überprüfen."
     },
     "A_5_36": {
-      "title": "Einhaltung von IS-Leitlinien und -Standards",
+      "title": "Einhaltung von Richtlinien, Regeln und Standards zur Informationssicherheit",
       "description": "Einhaltung von IS-Leitlinien, -Standards und -Verfahren regelmäßig überprüfen; Ergebnisse dokumentieren."
     },
     "A_5_37": {

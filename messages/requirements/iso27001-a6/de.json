@@ -9,7 +9,7 @@
       "description": "Mitarbeitern und Auftragnehmern vertraglich die Einhaltung von IS-Leitlinien als Beschäftigungsbedingung vorschreiben."
     },
     "A_6_3": {
-      "title": "IS-Bewusstsein, Schulung und Training",
+      "title": "Sensibilisierung, Schulung und Training zur Informationssicherheit",
       "description": "Sicherstellen, dass alle Mitarbeiter bei Einstellung und jährlich angemessene IS-Sensibilisierungsschulungen erhalten."
     },
     "A_6_4": {
@@ -29,7 +29,7 @@
       "description": "Sicherheitsmaßnahmen für Telearbeit definieren und umsetzen: Netzwerksicherheit, physische Sicherheit und Geräteschutz."
     },
     "A_6_8": {
-      "title": "Meldung von IS-Ereignissen",
+      "title": "Meldung von Sicherheitsereignissen",
       "description": "Klaren, einfach nutzbaren Mechanismus für Mitarbeiter bereitstellen, um Sicherheitsereignisse und Schwachstellen zu melden."
     }
   }

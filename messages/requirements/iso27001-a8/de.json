@@ -1,7 +1,7 @@
 {
   "requirements": {
     "A_8_1": {
-      "title": "Benutzer-Endgeräte",
+      "title": "Endgeräte der Benutzer",
       "description": "Informationen auf und verarbeitet durch Benutzer-Endgeräte (Laptops, Smartphones) durch eine Endgeräte-Sicherheitsrichtlinie schützen."
     },
     "A_8_2": {
@@ -105,7 +105,7 @@
       "description": "IS-Anforderungen für Anwendungsentwicklung und -beschaffung identifizieren, spezifizieren und genehmigen."
     },
     "A_8_27": {
-      "title": "Sichere Systemarchitektur und Engineering-Grundsätze",
+      "title": "Grundsätze für sichere Systemarchitektur und Systementwicklung",
       "description": "Sichere Engineering-Grundsätze für alle Entwicklungs- und Systemtechnikaktivitäten etablieren, dokumentieren und anwenden."
     },
     "A_8_28": {
