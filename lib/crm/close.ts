@@ -127,6 +127,17 @@ const createdLeadBody = z.object({
   id: z.string(),
   contacts: z.array(z.object({ id: z.string() })),
 });
+const emailListBody = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      contact_id: z.string().nullable().optional(),
+      sender: z.string().nullable().optional(),
+    }),
+  ),
+  has_more: z.boolean(),
+});
+const EMAIL_PAGE = 100;
 const contactBody = z.object({ id: z.string(), lead_id: z.string() });
 const leadContactsBody = z.object({ id: z.string(), contact_ids: z.array(z.string()) });
 const idBody = z.object({ id: z.string() });
@@ -315,22 +326,78 @@ export const closeClient = (settings: CloseSettings, fetchImpl: FetchLike = fetc
     },
 
     /**
-     * A note on the contact's timeline, dated when the thing happened. A refusal here
-     * means the contact or lead is gone or the text is not accepted: it is about this
-     * note, never about a setting.
+     * An email that was sent elsewhere (status "sent" only records it, Close sends
+     * nothing), on the contact's timeline with its real sender, recipient, subject and
+     * send time. Checked against the live API on 20.10.2026: the date is honoured, and
+     * the lead's status and Smart Views are untouched. A refusal here means the contact
+     * or lead is gone or the content is not accepted: it is about this email, never
+     * about a setting.
      */
-    addNote: async (
+    logSentEmail: async (
       link: CloseLink,
-      note: string,
-      at: Date,
+      email: {
+        readonly sender: string;
+        readonly to: string;
+        readonly subject: string;
+        readonly bodyText: string | null;
+        readonly sentAt: Date;
+      },
     ): Promise<CloseResult<null>> => {
-      const added = await request("POST", "/activity/note/", idBody, {
+      const logged = await request("POST", "/activity/email/", idBody, {
         lead_id: link.leadId,
         contact_id: link.contactId,
-        note,
-        date_created: at.toISOString(),
+        status: "sent",
+        sender: email.sender,
+        to: [email.to],
+        subject: email.subject,
+        body_text: email.bodyText,
+        date_created: email.sentAt.toISOString(),
       });
-      return added.ok ? ok(null) : added;
+      return logged.ok ? ok(null) : logged;
+    },
+
+    /**
+     * The emails filed under this contact on its lead, with their senders. Deleting a
+     * contact leaves them on the lead (checked against the live API, 21.10.2026), with the
+     * person's address and the mail text, so an erasure lists them to delete the ones we
+     * logged. A lead that is gone has none.
+     */
+    contactEmails: async (
+      link: CloseLink,
+    ): Promise<CloseResult<{ readonly id: string; readonly sender: string }[]>> => {
+      const found: { readonly id: string; readonly sender: string }[] = [];
+      for (let page = 0; page < MAX_SEARCH_PAGES; page++) {
+        const query = new URLSearchParams({
+          lead_id: link.leadId,
+          _limit: String(EMAIL_PAGE),
+          _skip: String(page * EMAIL_PAGE),
+          _fields: "id,contact_id,sender",
+        });
+        const listed = orNull(
+          await request("GET", `/activity/email/?${query}`, emailListBody),
+        );
+        if (!listed.ok) return listed;
+        if (!listed.value) return ok([]);
+        found.push(
+          ...listed.value.data.flatMap((e) =>
+            e.contact_id === link.contactId ? [{ id: e.id, sender: e.sender ?? "" }] : [],
+          ),
+        );
+        if (!listed.value.has_more) return ok(found);
+      }
+      return unavailable(`GET /activity/email/: more than ${MAX_SEARCH_PAGES} pages`);
+    },
+
+    /** Already gone counts as done. */
+    deleteEmail: async (emailId: string): Promise<CloseResult<null>> => {
+      const deleted = orNull(
+        await request(
+          "DELETE",
+          `/activity/email/${encodeURIComponent(emailId)}/`,
+          z.unknown(),
+        ),
+      );
+      return deleted.ok ? ok(null) : deleted;
     },
 
     /** Already gone counts as done. */
