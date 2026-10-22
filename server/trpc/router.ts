@@ -4,6 +4,7 @@ import { applicabilityRouter } from "./routers/applicability";
 import { assessmentRouter } from "./routers/assessment";
 import { assetRouter } from "./routers/asset";
 import { assignmentRouter } from "./routers/assignment";
+import { assistantsRouter } from "./routers/assistants";
 import { auditRouter } from "./routers/audit";
 import { billingRouter } from "./routers/billing";
 import { changeRouter } from "./routers/change";
@@ -32,6 +33,7 @@ import { platformAdminUsersRouter } from "./routers/platform-admin-users";
 import { policyRouter } from "./routers/policy";
 import { policyConfigRouter } from "./routers/policy-config";
 import { processingActivityRouter } from "./routers/processing-activity";
+import { recordsRouter } from "./routers/records";
 import { requirementRouter } from "./routers/requirement";
 import { reviewRouter } from "./routers/review";
 import { riskRouter } from "./routers/risk";
@@ -51,6 +53,7 @@ const isDev = process.env.NODE_ENV === "development";
 export const appRouter = router({
   requirement: requirementRouter,
   assessment: assessmentRouter,
+  assistants: assistantsRouter,
   llm: llmRouter,
   evidence: evidenceRouter,
   audit: auditRouter,
@@ -62,6 +65,7 @@ export const appRouter = router({
   ...(isDev ? { dev: devRouter } : {}),
   asset: assetRouter,
   risk: riskRouter,
+  records: recordsRouter,
   incident: incidentRouter,
   supplier: supplierRouter,
   policy: policyRouter,

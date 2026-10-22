@@ -135,6 +135,27 @@ const FIXTURE: CompanyExport = {
   trainings: [],
   managementReviews: [],
   incidents: [],
+  vulnerabilities: [
+    {
+      cveId: "CVE-2026-0001",
+      title: "Veraltetes WordPress Plugin",
+      description: null,
+      severity: "high",
+      cvssScore: "7.5",
+      source: "vulnerability_scan",
+      status: "treating",
+      discoveredAt: "2026-09-30",
+      treatmentNote: null,
+      acceptanceReason: null,
+      resolvedAt: null,
+    },
+  ],
+  patches: [],
+  changes: [],
+  exercises: [],
+  improvements: [],
+  internalAudits: [],
+  kpis: [],
 };
 
 const registers = (locale: PdfLocale) =>
@@ -150,6 +171,13 @@ describe("the export names fields the way the app's forms do", () => {
     "training",
     "managementReview",
     "incident",
+    "vulnerability",
+    "patch",
+    "change",
+    "exercise",
+    "improvement",
+    "internalAudit",
+    "kpi",
   ];
   for (const locale of PDF_LOCALES) {
     test(`every exported register field has its form's label (${locale})`, () => {
@@ -161,6 +189,31 @@ describe("the export names fields the way the app's forms do", () => {
       expect(unlabelled).toEqual([]);
     });
   }
+
+  // A message file that lacks a register's names parses as none (value-names.ts `NAMES`), and the
+  // file then prints raw codes, so each language is held against English, which names them all.
+  for (const locale of PDF_LOCALES) {
+    test(`every register names the same coded values as English (${locale})`, () => {
+      const unnamed = Object.entries(NAMES.en.registerValues).flatMap(
+        ([register, fields]) =>
+          Object.entries(fields ?? {}).flatMap(([field, names]) => {
+            const own = NAMES[locale].registerValues[register as Register]?.[field] ?? {};
+            return Object.keys(names)
+              .filter((code) => !Object.hasOwn(own, code))
+              .map((code) => `${register}.${field}.${code}`);
+          }),
+      );
+      expect(unnamed).toEqual([]);
+    });
+  }
+
+  test("English names every register's coded values at all", () => {
+    for (const fields of Object.values(NAMES.en.registerValues)) {
+      for (const names of Object.values(fields ?? {})) {
+        expect(Object.keys(names).length).toBeGreaterThan(0);
+      }
+    }
+  });
 });
 
 describe("the registers PDF", () => {
@@ -182,6 +235,17 @@ describe("the registers PDF", () => {
     expect(text).toContain("Backup-Häufigkeit täglich");
     expect(text).toContain("Risikostufe Hoch");
     for (const code of ["important", "manufacturing", "application", "security_key"]) {
+      expect(text).not.toContain(code);
+    }
+  });
+
+  test("a register names its own codes: a vulnerability's status is not an incident's", async () => {
+    const text = await textOf(registers("de"));
+    expect(text).toContain("Schwachstellen");
+    expect(text).toContain("Status In Behandlung");
+    expect(text).toContain("Quelle Schwachstellenscan");
+    expect(text).toContain("Schweregrad Hoch");
+    for (const code of ["treating", "vulnerability_scan"]) {
       expect(text).not.toContain(code);
     }
   });
